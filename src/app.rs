@@ -32,7 +32,7 @@ pub fn App() -> impl IntoView {
 
 #[server]
 pub async fn top_stories() -> Result<String, ServerFnError> {
-    let client = crate::api::Client::new("https://hacker-news.firebaseio.com/").unwrap();
+    let client = crate::api::Client::new("hacker-news.firebaseio.com").unwrap();
 
     match client.top_stories().get_all().await {
         Ok(text) => Ok(text),
@@ -45,12 +45,16 @@ pub async fn top_stories() -> Result<String, ServerFnError> {
 fn HomePage() -> impl IntoView {
     let stories_resource = OnceResource::new(top_stories());
 
+    let async_result = move || {
+        stories_resource
+            .get()
+            .map(|value| format!("Server returned {value:?}"))
+            // This loading state will only show before the first load
+            .unwrap_or_else(|| "Loading...".into())
+    };
     view! {
         <h1>"Welcome to Leptos!"</h1>
-    {move || match stories_resource.get() {
-        None => view! { <p>"Loading..."</p> }.into_any(),
-        Some(data) => view! { <pre>{data}</pre> }.into_any()
-    }}
+        {async_result}
     }
 }
 

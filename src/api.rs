@@ -39,6 +39,13 @@ impl<'c> TopStoriesEndpoint<'c> {
     }
 
     pub async fn get_all(&self) -> Result<String> {
-        dbg!(Ok(self.0.client.get(self.endpoint().unwrap()).send().await?.text().await?))
+        Ok(self
+            .0
+            .client
+            .get(self.endpoint().unwrap())
+            .send()
+            .await?
+            .text()
+            .await?)
     }
 }
