@@ -1,9 +1,11 @@
-use leptos::{prelude::*, reactive::spawn_local};
+use leptos::prelude::*;
 use leptos_meta::{provide_meta_context, Stylesheet, Title};
 use leptos_router::{
     components::{Route, Router, Routes},
     StaticSegment, WildcardSegment,
 };
+
+pub type StoryId = u32;
 
 #[component]
 pub fn App() -> impl IntoView {
@@ -31,13 +33,10 @@ pub fn App() -> impl IntoView {
 }
 
 #[server]
-pub async fn top_stories() -> Result<String, ServerFnError> {
+pub async fn top_stories() -> Result<Vec<crate::api::StoryId>, ServerFnError> {
     let client = crate::api::Client::new("hacker-news.firebaseio.com").unwrap();
-
-    match client.top_stories().get_all().await {
-        Ok(text) => Ok(text),
-        Err(e) => Err(ServerFnError::ServerError(e.to_string())),
-    }
+    let stories = client.top_stories().get_all().await.map_err(|e| ServerFnError::ServerError(e.to_string()))?;
+    Ok(stories)
 }
 
 /// Renders the home page of your application.
@@ -45,16 +44,32 @@ pub async fn top_stories() -> Result<String, ServerFnError> {
 fn HomePage() -> impl IntoView {
     let stories_resource = OnceResource::new(top_stories());
 
-    let async_result = move || {
-        stories_resource
-            .get()
-            .map(|value| format!("Server returned {value:?}"))
-            // This loading state will only show before the first load
-            .unwrap_or_else(|| "Loading...".into())
-    };
     view! {
-        <h1>"Welcome to Leptos!"</h1>
-        {async_result}
+        <Suspense fallback=|| view! { <p>"Loading..."</p> }>
+            { move || {
+                match stories_resource.get() {
+                    Some(Ok(stories)) => view! { <StoryList stories /> }.into_any(),
+                    Some(Err(err)) => view! { <p>{err.to_string()}</p> }.into_any(),
+                    None => view! { <p>{"Loading...".to_string()}</p> }.into_any(),
+                }
+            }}
+        </Suspense>
+    }
+}
+
+/// Displays a list of stories.
+#[component]
+fn StoryList(stories: Vec<StoryId>) -> impl IntoView {
+    view! {
+        <ul>
+            <For
+                each=move || stories.clone()
+                key=|story| story.clone()
+                children=move |story| {
+                    view! { <li>{story.to_string()}</li> }
+                }
+            />
+        </ul>
     }
 }
 
